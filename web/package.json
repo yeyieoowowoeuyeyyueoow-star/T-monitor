@@ -1,5 +1,8 @@
 {
   "name": "@workspace/root",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": ["bufferutil", "esbuild", "es5-ext", "utf-8-validate"]
+  }
 }
