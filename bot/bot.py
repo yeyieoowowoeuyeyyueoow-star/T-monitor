@@ -185,7 +185,7 @@ def main():
                     save_state(state)
 
             # ── جلب النتائج الجديدة وإرسالها ──────────────────────────────
-            params = {}
+            params = {"enrichedOnly": "true"}
             if state["last_id"]:
                 params["since"] = state["last_id"]
 

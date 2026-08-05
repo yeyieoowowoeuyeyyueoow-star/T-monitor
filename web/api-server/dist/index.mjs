@@ -32734,6 +32734,7 @@ var ResultStore = class {
     result.senderUsername = patch.senderUsername;
     result.sharedGroups = patch.sharedGroups;
     result.sharedGroupsCount = patch.sharedGroupsCount;
+    result.enriched = true;
   }
   clear() {
     this.results = [];
@@ -32954,7 +32955,8 @@ var TelegramService = class {
       sharedGroups: [],
       // enriched in Phase 2
       sharedGroupsCount: 0,
-      noforwards: opts.noforwards
+      noforwards: opts.noforwards,
+      enriched: false
     });
     return id;
   }
@@ -33481,7 +33483,14 @@ var router4 = (0, import_express4.Router)();
 router4.get("/", (req, res) => {
   const since = req.query.since || null;
   const limit = Math.min(parseInt(req.query.limit || "50", 10), 200);
-  const results = since ? resultStore.getSince(since) : resultStore.getAll();
+  const enrichedOnly = req.query.enrichedOnly === "true";
+  let results = since ? resultStore.getSince(since) : resultStore.getAll();
+  if (enrichedOnly) {
+    const cutoff = Date.now() - 2e4;
+    results = results.filter(
+      (r) => r.enriched || new Date(r.timestamp).getTime() < cutoff
+    );
+  }
   res.json(results.slice(0, limit));
 });
 router4.delete("/", (_req, res) => {

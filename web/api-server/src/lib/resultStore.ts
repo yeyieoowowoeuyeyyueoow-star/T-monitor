@@ -12,6 +12,7 @@ export interface MatchedResult {
   sharedGroups: string[];        // المجموعات المشتركة مع المرسل
   sharedGroupsCount: number;
   noforwards: boolean;           // هل قيّد المرسل تحويل رسائله
+  enriched: boolean;             // true بعد اكتمال Phase-2 (سيرفر، يوزر، مجموعات مشتركة)
 }
 
 class ResultStore {
@@ -60,10 +61,11 @@ class ResultStore {
   }): void {
     const result = this.results.find((r) => r.id === id);
     if (!result) return;
-    result.senderName       = patch.senderName;
-    result.senderUsername   = patch.senderUsername;
-    result.sharedGroups     = patch.sharedGroups;
+    result.senderName        = patch.senderName;
+    result.senderUsername    = patch.senderUsername;
+    result.sharedGroups      = patch.sharedGroups;
     result.sharedGroupsCount = patch.sharedGroupsCount;
+    result.enriched          = true;
   }
 
   clear(): void {

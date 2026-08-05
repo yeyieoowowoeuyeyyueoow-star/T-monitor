@@ -215,6 +215,7 @@ class TelegramService {
       sharedGroups:     [],            // enriched in Phase 2
       sharedGroupsCount: 0,
       noforwards:       opts.noforwards,
+      enriched:         false,
     });
 
     return id;
