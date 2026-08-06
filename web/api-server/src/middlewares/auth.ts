@@ -12,6 +12,7 @@ const PUBLIC_PATHS = new Set([
   "/api/auth/login",
   "/api/auth/status",
   "/api/health",
+  "/api/healthz",
 ]);
 
 function isLocalRequest(req: Request): boolean {

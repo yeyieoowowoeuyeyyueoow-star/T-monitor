@@ -33535,7 +33535,8 @@ var COOKIE_NAME = "tgm_auth";
 var PUBLIC_PATHS = /* @__PURE__ */ new Set([
   "/api/auth/login",
   "/api/auth/status",
-  "/api/health"
+  "/api/health",
+  "/api/healthz"
 ]);
 function isLocalRequest(req) {
   const ip = req.ip ?? req.socket.remoteAddress ?? "";
