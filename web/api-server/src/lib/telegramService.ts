@@ -484,6 +484,11 @@ class TelegramService {
     this._apiHash = apiHash;
     this._phone   = phone;
 
+    // Resolves once Telegram has actually requested the phone code
+    // (i.e. after client.start() reaches the phoneCode callback stage)
+    let signalCodeRequested!: () => void;
+    const codeRequested = new Promise<void>((r) => { signalCodeRequested = r; });
+
     this.authPromise = new Promise<void>((resolveAuth, rejectAuth) => {
       client.start({
         phoneNumber: phone,
@@ -491,6 +496,7 @@ class TelegramService {
           new Promise<string>((resolve) => {
             this._authState = "waiting_code";
             this.resolveCode = resolve;
+            signalCodeRequested(); // ← unblock sendCode() only after code is truly sent
           }),
         password: () =>
           new Promise<string>((resolve) => {
@@ -499,6 +505,7 @@ class TelegramService {
           }),
         onError: (err: Error) => {
           this._authState = "idle";
+          signalCodeRequested(); // unblock even on error so sendCode() can throw
           rejectAuth(err);
         },
       }).then(async () => {
@@ -507,11 +514,14 @@ class TelegramService {
         this.client    = client;
         this._authState = "authenticated";
         resolveAuth();
-      }).catch(rejectAuth);
+      }).catch((err) => {
+        signalCodeRequested();
+        rejectAuth(err);
+      });
     });
 
-    this._authState = "waiting_code";
-    await client.connect();
+    // Wait until Telegram has actually dispatched the code before returning
+    await codeRequested;
   }
 
   submitCode(code: string): void {
