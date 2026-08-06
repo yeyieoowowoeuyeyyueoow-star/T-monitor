@@ -4,6 +4,7 @@ TG Monitor — Python Bot Notifier
 يعمل poll على API الخادم المحلي ويرسل التنبيهات عبر Telegram Bot API.
 """
 
+import html
 import json
 import os
 import time
@@ -77,17 +78,22 @@ def bot_send(token: str, chat_id: str, text: str):
 
 # ── Message formatters ─────────────────────────────────────────────────────
 
+def e(text: str) -> str:
+    """HTML-escape a plain-text value before embedding it in an HTML Telegram message."""
+    return html.escape(str(text), quote=False)
+
+
 def format_result(r: dict) -> str:
-    keywords      = " | ".join(f"<code>{k}</code>" for k in r.get("matchedKeywords", []))
-    group         = r.get("groupName", "?")
-    sender        = r.get("senderName", "?")
+    keywords      = " | ".join(f"<code>{e(k)}</code>" for k in r.get("matchedKeywords", []))
+    group         = e(r.get("groupName", "?"))
+    sender        = e(r.get("senderName", "?"))
     username      = r.get("senderUsername")
-    snippet       = r.get("snippet", "").strip()
+    snippet       = e(r.get("snippet", "").strip())
     link          = r.get("messageLink")
     shared        = r.get("sharedGroups", [])
     shared_count  = r.get("sharedGroupsCount", len(shared))
 
-    sender_display = f"@{username}" if username else sender
+    sender_display = f"@{e(username)}" if username else sender
 
     lines = [
         f"🔍 <b>كلمة مفتاحية:</b> {keywords}",
@@ -97,7 +103,7 @@ def format_result(r: dict) -> str:
 
     # المجموعات المشتركة مع المرسل
     if shared_count > 0:
-        shared_names = "\n".join(f"  • {name}" for name in shared[:10])
+        shared_names = "\n".join(f"  • {e(name)}" for name in shared[:10])
         lines.append(
             f"👥 <b>مجموعات مشتركة مع المرسل ({shared_count}):</b>\n{shared_names}"
         )
@@ -195,12 +201,24 @@ def main():
                 continue
 
             for result in reversed(results):
-                msg  = format_result(result)
-                resp = bot_send(token, chat_id, msg)
-                if resp and resp.get("ok"):
-                    print(f"[bot] ✅ أُرسلت: {result.get('matchedKeywords')}", flush=True)
+                msg = format_result(result)
+                sent = False
+                for attempt in range(3):          # حاول 3 مرات عند الفشل
+                    resp = bot_send(token, chat_id, msg)
+                    if resp and resp.get("ok"):
+                        print(f"[bot] ✅ أُرسلت: {result.get('matchedKeywords')}", flush=True)
+                        sent = True
+                        break
+                    if attempt < 2:
+                        time.sleep(2)             # انتظر ثانيتين قبل إعادة المحاولة
+                if not sent:
+                    print(f"[bot] ❌ فشل إرسال النتيجة بعد 3 محاولات: {result.get('id')}", flush=True)
+                # حدّث last_id بعد كل رسالة حتى لو فشلت — لتجنب إعادة الإرسال اللانهائية
+                state["last_id"] = result["id"]
+                save_state(state)
 
-            if results:
+            # تحديث بعد كل دورة حتى لو لا توجد نتائج جديدة
+            if results and state["last_id"] != results[0]["id"]:
                 state["last_id"] = results[0]["id"]
                 save_state(state)
 
