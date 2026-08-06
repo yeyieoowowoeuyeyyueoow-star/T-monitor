@@ -1,4 +1,10 @@
-// In-memory matched-message store — max 2000 results, no database
+// Matched-message store — persisted to disk, max 2000 results
+import fs from "fs";
+import path from "path";
+import os from "os";
+
+const RESULTS_FILE = path.join(os.homedir(), ".tg-monitor-results.json");
+
 export interface MatchedResult {
   id: string;
   groupName: string;
@@ -15,10 +21,55 @@ export interface MatchedResult {
   enriched: boolean;             // true بعد اكتمال Phase-2 (سيرفر، يوزر، مجموعات مشتركة)
 }
 
+interface PersistedState {
+  results: MatchedResult[];
+  totalCount: number;
+}
+
 class ResultStore {
   private results: MatchedResult[] = [];
   private _totalCount = 0;
   private readonly MAX = 2000;
+
+  // Debounce saves so rapid incoming messages don't thrash the disk
+  private _saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    this.load();
+  }
+
+  private load(): void {
+    try {
+      if (fs.existsSync(RESULTS_FILE)) {
+        const raw: PersistedState = JSON.parse(
+          fs.readFileSync(RESULTS_FILE, "utf-8"),
+        );
+        if (Array.isArray(raw.results)) {
+          this.results = raw.results.slice(0, this.MAX);
+          this._totalCount = typeof raw.totalCount === "number" ? raw.totalCount : this.results.length;
+        }
+      }
+    } catch (_) {}
+  }
+
+  private scheduleSave(): void {
+    if (this._saveTimer) return;
+    this._saveTimer = setTimeout(() => {
+      this._saveTimer = null;
+      this.flush();
+    }, 2000); // write at most once every 2 seconds
+  }
+
+  /** Write immediately — call on clean shutdown if needed */
+  flush(): void {
+    try {
+      const state: PersistedState = {
+        results: this.results,
+        totalCount: this._totalCount,
+      };
+      fs.writeFileSync(RESULTS_FILE, JSON.stringify(state), "utf-8");
+    } catch (_) {}
+  }
 
   add(result: MatchedResult): void {
     this.results.unshift(result);
@@ -27,6 +78,7 @@ class ResultStore {
     if (this.results.length > this.MAX + 50) {
       this.results.length = this.MAX;
     }
+    this.scheduleSave();
   }
 
   getAll(): MatchedResult[] {
@@ -36,10 +88,6 @@ class ResultStore {
   /**
    * Returns all results NEWER than the given afterId.
    * Results are stored newest-first (index 0 = newest).
-   *
-   * Fix: previous code used `if (idx <= 0)` which also returned []
-   * when idx === -1 (ID not found, e.g. after store clear), causing
-   * the bot to silently miss all accumulated results.
    */
   getSince(afterId: string | null): MatchedResult[] {
     if (!afterId) return this.results;
@@ -66,10 +114,12 @@ class ResultStore {
     result.sharedGroups      = patch.sharedGroups;
     result.sharedGroupsCount = patch.sharedGroupsCount;
     result.enriched          = true;
+    this.scheduleSave();
   }
 
   clear(): void {
     this.results = [];
+    this.flush();
   }
 
   get totalCount() {
