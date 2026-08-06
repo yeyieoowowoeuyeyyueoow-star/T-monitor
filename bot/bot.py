@@ -11,7 +11,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
-API_BASE = "http://localhost:5000/api"
+API_BASE = "http://localhost:{}/api".format(os.environ.get("PORT", "5000"))
 STATE_FILE = os.path.expanduser("~/.tg-monitor-bot-state.json")
 POLL_INTERVAL = 2   # ثانية بين كل poll
 STARTUP_DELAY = 4   # انتظر حتى يبدأ سيرفر Node.js
