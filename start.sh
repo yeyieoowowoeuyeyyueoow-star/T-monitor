@@ -2,10 +2,24 @@
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# احترم PORT من البيئة، وإلا استخدم 5000
+export PORT="${PORT:-5000}"
+
 echo "==> Building frontend..."
 cd "$ROOT/web/tg-web"
-BASE_PATH=/ npm run build
+pnpm run build
 
-echo "==> Starting on port 5000..."
+# Start Python bot in background
+echo "==> Starting Python bot..."
+cd "$ROOT"
+python3 "$ROOT/bot/bot.py" &
+BOT_PID=$!
+
+echo "==> Starting Node.js server on port ${PORT}..."
 cd "$ROOT/web/api-server"
-PORT=5000 node dist/index.mjs
+NODE_ENV=production node dist/index.mjs &
+NODE_PID=$!
+
+trap 'echo "==> Shutting down..."; kill "$BOT_PID" "$NODE_PID" 2>/dev/null; exit' INT TERM EXIT
+
+wait "$NODE_PID"

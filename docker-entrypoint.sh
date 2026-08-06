@@ -10,8 +10,14 @@ export PORT="${PORT:-8080}"
 python3 /app/bot/bot.py &
 BOT_PID=$!
 
-# Kill bot when this script exits
-trap 'kill "$BOT_PID" 2>/dev/null; exit' INT TERM EXIT
+echo "==> Starting Node.js server on port ${PORT}..."
 
-echo "==> Starting Node.js server on port $PORT..."
-exec node /app/web/api-server/dist/index.mjs
+# شغّل Node في الخلفية حتى يعمل الـ trap عند SIGTERM
+node /app/web/api-server/dist/index.mjs &
+NODE_PID=$!
+
+# أوقف كلا العمليتين عند استقبال إشارة إيقاف
+trap 'echo "==> Shutting down..."; kill "$BOT_PID" "$NODE_PID" 2>/dev/null; wait; exit' INT TERM EXIT
+
+# انتظر Node — عند خروجه يُفعَّل الـ trap ويُوقف البوت أيضاً
+wait "$NODE_PID"

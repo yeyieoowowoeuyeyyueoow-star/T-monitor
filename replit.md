@@ -22,7 +22,7 @@ It will:
 2. Build the API server (`web/api-server`)
 3. Build the React frontend (`web/tg-web`)
 4. Start the Python notification bot in the background
-5. Start the Express server on **port 5000** (serves both API and built frontend)
+5. Start the Express server (serves both API and built frontend)
 
 ## Required secrets
 
@@ -31,16 +31,34 @@ It will:
 | `SESSION_SECRET` | Signs session cookies |
 | `DASHBOARD_PASSWORD` | Password for the web dashboard login |
 
+## Optional environment variables (Railway / Docker)
+
+| Variable | Purpose |
+|---|---|
+| `PORT` | Port for the server (Railway sets this automatically — default: 5000 locally, 8080 on Railway) |
+| `BOT_TOKEN` | Telegram Bot Token (بديل عن الإعداد من الواجهة — لا يضيع عند Restart) |
+| `BOT_CHAT_ID` | Telegram Chat ID (نفس الغرض) |
+
+> **ملاحظة Railway:** إذا أضفت `BOT_TOKEN` و`BOT_CHAT_ID` كـ Variables في Railway، لن تحتاج لإعادة إعداد البوت بعد كل Restart.
+
 ## First-time setup after launch
 
 1. Open the app and log in with `DASHBOARD_PASSWORD`
 2. Enter your Telegram **API_ID** and **API_HASH** (from [my.telegram.org](https://my.telegram.org)) via the dashboard wizard
 3. Complete the phone-number login flow in the dashboard
 
+## Data persistence
+
+- Keywords and results are stored in `~/.tg-monitor-*.json` files.
+- On Railway/Docker without a mounted volume, these files reset on every container restart.
+- **Recommended:** add a Railway Volume mounted at `/root` to preserve all data between restarts.
+- Bot config (`BOT_TOKEN` / `BOT_CHAT_ID`) can alternatively be set as environment variables to survive restarts.
+
 ## Notes
 
-- Data (keywords, results) is stored in-memory inside the container and is lost on restart. A persistent storage solution (file or database) would be a useful addition.
 - The Python bot polls the local API every 2 seconds and sends Telegram Bot API notifications.
+- On first start, the bot skips old messages to avoid flooding the chat.
+- Notifications are retried up to 3 times with exponential backoff on failure.
+- The `last_id` cursor only advances on successful sends — failed messages are retried next poll.
 
 ## User preferences
-

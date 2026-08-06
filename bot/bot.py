@@ -15,7 +15,7 @@ import urllib.error
 API_BASE = "http://localhost:{}/api".format(os.environ.get("PORT", "5000"))
 STATE_FILE = os.path.expanduser("~/.tg-monitor-bot-state.json")
 POLL_INTERVAL = 2   # ثانية بين كل poll
-STARTUP_DELAY = 4   # انتظر حتى يبدأ سيرفر Node.js
+STARTUP_DELAY = 8   # انتظر حتى يبدأ سيرفر Node.js
 
 
 # ── State ──────────────────────────────────────────────────────────────────
@@ -156,6 +156,14 @@ def main():
 
     state = load_state()
 
+    # عند أول تشغيل: ضبط last_id على أحدث رسالة لتجنب إغراق المحادثة
+    if state["last_id"] is None:
+        initial = api_get("/results", {"limit": "1"})
+        if initial and len(initial) > 0:
+            state["last_id"] = initial[0]["id"]
+            save_state(state)
+            print(f"[bot] أول تشغيل — بدء المتابعة من ID: {state['last_id']}", flush=True)
+
     while True:
         try:
             # جلب إعدادات البوت
@@ -191,11 +199,12 @@ def main():
                     save_state(state)
 
             # ── جلب النتائج الجديدة وإرسالها ──────────────────────────────
-            params = {"enrichedOnly": "true"}
+            # لا نستخدم enrichedOnly حتى لا نتخطى رسائل غير مكتملة الإثراء
+            params = {}
             if state["last_id"]:
                 params["since"] = state["last_id"]
 
-            results = api_get("/results", params)
+            results = api_get("/results", params if params else None)
             if results is None:
                 time.sleep(POLL_INTERVAL)
                 continue
@@ -210,17 +219,16 @@ def main():
                         sent = True
                         break
                     if attempt < 2:
-                        time.sleep(2)             # انتظر ثانيتين قبل إعادة المحاولة
-                if not sent:
-                    print(f"[bot] ❌ فشل إرسال النتيجة بعد 3 محاولات: {result.get('id')}", flush=True)
-                # حدّث last_id بعد كل رسالة حتى لو فشلت — لتجنب إعادة الإرسال اللانهائية
-                state["last_id"] = result["id"]
-                save_state(state)
+                        time.sleep(2 ** attempt)  # exponential backoff: 1s ثم 2s
 
-            # تحديث بعد كل دورة حتى لو لا توجد نتائج جديدة
-            if results and state["last_id"] != results[0]["id"]:
-                state["last_id"] = results[0]["id"]
-                save_state(state)
+                if sent:
+                    # تحديث last_id فقط عند النجاح لتجنب ضياع رسائل صامت
+                    state["last_id"] = result["id"]
+                    save_state(state)
+                else:
+                    print(f"[bot] ❌ فشل إرسال النتيجة بعد 3 محاولات: {result.get('id')} — سيُعاد المحاولة في الدورة القادمة", flush=True)
+                    # لا نتقدم في last_id — سيُعاد إرسالها في الدورة التالية
+                    break
 
         except Exception as e:
             print(f"[bot] خطأ: {e}", flush=True)

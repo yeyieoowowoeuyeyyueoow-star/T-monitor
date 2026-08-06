@@ -1,14 +1,13 @@
 import { Router } from "express";
 import { COOKIE_NAME } from "../middlewares/auth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
 const DASHBOARD_PASSWORD = process.env["DASHBOARD_PASSWORD"] ?? "";
 
 if (!DASHBOARD_PASSWORD) {
-  console.warn(
-    "[auth] ⚠️  DASHBOARD_PASSWORD env var is not set — dashboard is unprotected from the browser! Set it to enable password protection.",
-  );
+  logger.warn("DASHBOARD_PASSWORD env var is not set — dashboard is unprotected from the browser! Set it to enable password protection.");
 }
 
 // GET /api/auth/status
@@ -22,6 +21,7 @@ router.get("/status", (req, res) => {
 });
 
 // POST /api/auth/login  { password }
+// ملاحظة: يُنصح بإضافة rate limiting على هذا المسار في الإنتاج
 router.post("/login", (req, res) => {
   if (!DASHBOARD_PASSWORD) {
     // No password configured — auto-allow
@@ -37,6 +37,7 @@ router.post("/login", (req, res) => {
 
   const { password } = req.body as { password?: string };
   if (!password || password !== DASHBOARD_PASSWORD) {
+    req.log.warn({ ip: req.ip }, "Failed login attempt");
     res.status(401).json({ error: "Incorrect password" });
     return;
   }

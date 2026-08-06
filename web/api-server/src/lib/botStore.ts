@@ -14,7 +14,16 @@ class BotStore {
   private _config: BotConfig = { botToken: "", chatId: "" };
 
   constructor() {
-    this.load();
+    // أولوية: متغيرات البيئة (مناسبة لـ Railway حيث الملفات تُحذف عند Restart)
+    const envToken  = process.env["BOT_TOKEN"]   ?? "";
+    const envChatId = process.env["BOT_CHAT_ID"] ?? "";
+
+    if (envToken && envChatId) {
+      this._config = { botToken: envToken, chatId: envChatId };
+      logger.info("Bot config loaded from environment variables");
+    } else {
+      this.load();
+    }
   }
 
   private load(): void {
@@ -25,7 +34,7 @@ class BotStore {
           botToken: raw.botToken || "",
           chatId: raw.chatId || "",
         };
-        logger.info("Bot config loaded");
+        logger.info("Bot config loaded from file");
       }
     } catch (err) {
       logger.warn({ err }, "Failed to load bot config");
