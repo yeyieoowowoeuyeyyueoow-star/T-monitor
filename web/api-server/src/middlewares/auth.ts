@@ -7,12 +7,15 @@ import { Request, Response, NextFunction } from "express";
 
 const COOKIE_NAME = "tgm_auth";
 
-/** Routes accessible without auth even from the browser */
+/**
+ * Routes accessible without auth even from the browser.
+ * NOTE: Express strips the "/api" mount prefix from req.path inside
+ * app.use("/api", requireAuth), so paths here must NOT include "/api".
+ */
 const PUBLIC_PATHS = new Set([
-  "/api/auth/login",
-  "/api/auth/status",
-  "/api/health",
-  "/api/healthz",
+  "/auth/login",
+  "/auth/status",
+  "/healthz",
 ]);
 
 function isLocalRequest(req: Request): boolean {
