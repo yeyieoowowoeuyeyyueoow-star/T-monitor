@@ -7,10 +7,16 @@ TG Monitor — Python Bot Notifier
 import html
 import json
 import os
+import ssl
 import time
 import urllib.request
 import urllib.parse
 import urllib.error
+
+# Railway يستخدم proxy يكسر شهادات SSL — نتجاوز التحقق لـ Telegram API فقط
+_SSL_CTX = ssl.create_default_context()
+_SSL_CTX.check_hostname = False
+_SSL_CTX.verify_mode = ssl.CERT_NONE
 
 API_BASE = "http://localhost:{}/api".format(os.environ.get("PORT", "5000"))
 STATE_FILE = os.path.expanduser("~/.tg-monitor-bot-state.json")
@@ -66,7 +72,7 @@ def bot_send(token: str, chat_id: str, text: str):
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as r:
             return json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         body_err = e.read().decode()
